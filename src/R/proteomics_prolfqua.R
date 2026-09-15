@@ -45,6 +45,25 @@ validate_proteomics_metadata <- function(metadata, cfg) {
   invisible(metadata)
 }
 
+coerce_proteomics_factors <- function(data, cfg) {
+  cols <- cfg$columns
+
+  if (!is.null(cols$condition) && isTRUE(cfg$model$condition_as_factor %||% TRUE)) {
+    data[[cols$condition]] <- factor(data[[cols$condition]])
+  }
+  if (!is.null(cols$timepoint) && isTRUE(cfg$model$timepoint_as_factor %||% TRUE)) {
+    data[[cols$timepoint]] <- factor(data[[cols$timepoint]])
+  }
+  if (!is.null(cols$animal_id)) {
+    data[[cols$animal_id]] <- factor(data[[cols$animal_id]])
+  }
+  if (!is.null(cols$batch) && isTRUE(cfg$model$batch_as_factor %||% TRUE)) {
+    data[[cols$batch]] <- factor(data[[cols$batch]])
+  }
+
+  data
+}
+
 read_proteomics_wide <- function(abundance_path, metadata_path, cfg) {
   if (!identical(cfg$input$format, "wide_protein")) {
     stop("Current adapter supports input.format = 'wide_protein' only.")
@@ -88,6 +107,7 @@ read_proteomics_wide <- function(abundance_path, metadata_path, cfg) {
 
   long[[protein_id]] <- as.character(long[[protein_id]])
   long[[sample_id]] <- as.character(long[[sample_id]])
+  long <- coerce_proteomics_factors(long, cfg)
 
   if (isTRUE(cfg$preprocessing$zero_or_negative_to_na)) {
     long$intensity[!is.na(long$intensity) & long$intensity <= 0] <- NA_real_
@@ -206,8 +226,9 @@ proteomics_fixed_effects <- function(cfg) {
 
   condition <- cfg$columns$condition
   timepoint <- cfg$columns$timepoint
+  batch <- cfg$columns$batch
 
-  if (!is.null(condition) && !is.null(timepoint)) {
+  fixed <- if (!is.null(condition) && !is.null(timepoint)) {
     paste(condition, "*", timepoint)
   } else if (!is.null(condition)) {
     condition
@@ -216,6 +237,12 @@ proteomics_fixed_effects <- function(cfg) {
   } else {
     stop("No fixed effects are configured.")
   }
+
+  if (!is.null(batch)) {
+    fixed <- paste(fixed, "+", batch)
+  }
+
+  fixed
 }
 
 proteomics_design_columns <- function(lfq, cfg) {
