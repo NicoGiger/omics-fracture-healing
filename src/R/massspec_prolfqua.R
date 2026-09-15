@@ -164,9 +164,26 @@ ms_qc_tables <- function(lfq, cfg) {
 }
 
 ms_biological_lfq <- function(lfq, cfg) {
-  sample_type <- cfg$columns$sample_type
+  cols <- cfg$columns
+  response <- lfq$response()
   dat <- lfq$data_long() |>
-    dplyr::filter(.data[[sample_type]] == "biological")
+    dplyr::filter(.data[[cols$sample_type]] == "biological") |>
+    droplevels()
+
+  max_missing <- cfg$filtering$max_missing_fraction
+  if (!is.null(max_missing)) {
+    protein_id <- cols$protein_id
+    keep <- dat |>
+      dplyr::group_by(.data[[protein_id]]) |>
+      dplyr::summarise(
+        missing_fraction = mean(is.na(.data[[response]])),
+        .groups = "drop"
+      ) |>
+      dplyr::filter(.data$missing_fraction <= as.numeric(max_missing)) |>
+      dplyr::pull(.data[[protein_id]])
+    dat <- dplyr::filter(dat, .data[[protein_id]] %in% keep)
+  }
+
   prolfqua::LFQData$new(dat, lfq$get_config())
 }
 
