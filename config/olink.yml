@@ -1,0 +1,35 @@
+# Olink Target 48 Mouse quantified-concentration analysis configuration.
+# This scaffold is for the supplied QUANT workbook (pg/mL), not an NPX export.
+
+input:
+  sheet: 1
+
+columns:
+  sample_id: sample_id
+  animal_id: animal_id
+  analysis_cell: analysis_cell
+  sample_type: sample_type
+  batch: null
+
+preprocessing:
+  exclude_failed_qc: true
+  # Quantified concentrations are positive and are analysed on log2 scale.
+  zero_or_negative_to_na: true
+  log2_transform: true
+  # No censor-value substitution or imputation by default.
+  impute_missing: false
+
+filtering:
+  # Leave unset until assay-specific missingness/quantification limits are reviewed.
+  max_missing_fraction: null
+
+model:
+  # Cell-means parameterization matches the MS design and avoids forcing
+  # unobserved condition x endpoint combinations (e.g. Olink Day49 has only
+  # Osteotomy samples in the supplied metadata).
+  fixed_effects: "0 + analysis_cell"
+  repeated_measure_method: duplicateCorrelation
+  limma:
+    trend: true
+    robust: true
+  contrasts: {}
