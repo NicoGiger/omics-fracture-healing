@@ -64,7 +64,7 @@ The stable `prolfqua` v1.5.0 release is pinned in `renv`.
 The original DIA-NN report is large and should remain local. `scripts/00_extract_diann_quant.R` reads only the columns needed to compare available protein-level quantities (`PG.MaxLFQ`, `PG.Normalised`, `PG.Quantity`) and filtering information:
 
 ```bash
-Rscript scripts/00_extract_diann_quant.R /path/to/report.tsv data/proteomics/diann_extract
+Rscript scripts/00_extract_diann_quant.R /path/to/report.tsv data/proteomics/massspec/diann_extract
 ```
 
 It writes a compact `Run x Protein.Group` table plus field/consistency summaries. The current checked wide matrix was generated from DIA-NN `PG.Normalised`; the canonical protein quantity should be fixed only after inspecting the local DIA-NN extract.
