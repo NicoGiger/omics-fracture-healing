@@ -6,7 +6,7 @@ if (length(args) < 1L || length(args) > 2L) {
   stop(
     paste0(
       "Usage: Rscript scripts/00_extract_diann_quant.R <report.tsv> [output_dir]\n",
-      "Example: Rscript scripts/00_extract_diann_quant.R /path/to/report.tsv data/proteomics/diann_extract"
+      "Example: Rscript scripts/00_extract_diann_quant.R /path/to/report.tsv data/proteomics/massspec/diann_extract"
     ),
     call. = FALSE
   )
@@ -20,7 +20,7 @@ if (!requireNamespace("data.table", quietly = TRUE)) {
 }
 
 input_file <- normalizePath(args[[1L]], mustWork = TRUE)
-output_dir <- if (length(args) == 2L) args[[2L]] else "data/proteomics/diann_extract"
+output_dir <- if (length(args) == 2L) args[[2L]] else "data/proteomics/massspec/diann_extract"
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 header <- names(
