@@ -30,45 +30,81 @@ Paper-facing analysis repository for the fracture-healing study, integrating spa
 
 ### Serum proteomics
 
-The serum workflow uses [`prolfqua`](https://github.com/fgcz/prolfqua) for proteomics data representation, preprocessing/QC, and differential modelling. The environment setup pins the stable `prolfqua` v1.5.0 release in `renv` rather than tracking the moving development branch.
+Mass spectrometry and Olink are treated as separate assays through QC and differential analysis. They are integrated only downstream at the biological-interpretation stage.
 
-#### DIA-NN source inspection
+#### Shared serum metadata
 
-The original DIA-NN report is large and should remain local. `scripts/00_extract_diann_quant.R` reads only the columns needed to determine which protein-level quantity and filtering rules should feed the analysis.
+The supplied study metadata contains assay flags and the paired baseline/endpoint design. `scripts/00_prepare_serum_metadata.R` converts it to clean assay-specific tables with:
 
-After initializing the R environment, run:
+- `sample_id`
+- `animal_id`
+- `condition`
+- measured `day`
+- each animal's `endpoint_day` cohort
+- `visit` (`baseline` / `endpoint`)
+- `analysis_cell` (for explicit cell-means contrasts)
+- `sample_type` (`biological` / `process_qc`)
+
+Example:
+
+```bash
+Rscript scripts/00_prepare_serum_metadata.R /path/to/Metadata.csv
+```
+
+This writes `metadata/massspec_samples.csv` and `metadata/olink_samples.csv`.
+
+#### Mass spectrometry: DIA-NN -> prolfqua
+
+The MS branch stays as close as possible to the standard [`prolfqua`](https://github.com/fgcz/prolfqua) workflow. Custom code is limited to DIA-NN input adaptation and study-specific design/contrast handling:
+
+`DIA-NN -> AnalysisConfiguration -> setup_analysis() -> LFQData -> Transformer/Plotter -> Model -> Contrasts`
+
+The stable `prolfqua` v1.5.0 release is pinned in `renv`.
+
+The original DIA-NN report is large and should remain local. `scripts/00_extract_diann_quant.R` reads only the columns needed to compare available protein-level quantities (`PG.MaxLFQ`, `PG.Normalised`, `PG.Quantity`) and filtering information:
 
 ```bash
 Rscript scripts/00_extract_diann_quant.R /path/to/report.tsv data/proteomics/diann_extract
 ```
 
-The script does not alter or filter the source report. It writes:
+It writes a compact `Run x Protein.Group` table plus field/consistency summaries. The current checked wide matrix was generated from DIA-NN `PG.Normalised`; the canonical protein quantity should be fixed only after inspecting the local DIA-NN extract.
 
-- `diann_columns.txt` — all DIA-NN report column names.
-- `diann_protein_quant.tsv.gz` — compact `Run x Protein.Group` table containing available protein-level quantities (`PG.MaxLFQ`, `PG.Normalised`, and/or `PG.Quantity`), protein-group Q-values, annotation fields, and precursor/Q-value counts.
-- `diann_protein_field_consistency.tsv` — checks whether protein-level DIA-NN fields are actually constant across precursor rows for each `Run x Protein.Group`.
-- `diann_extract_summary.txt` — source size, selected fields, run/protein counts, and output locations.
+MS analysis:
 
-This compact extract is intended for local inspection before deciding whether the existing `PG.Normalised` wide matrix should remain the canonical mass-spectrometry input or be regenerated from another DIA-NN protein quantity. The raw DIA-NN report itself should not be committed.
+```bash
+Rscript scripts/01_ms_qc.R
+# inspect results/proteomics/massspec/model_matrix_columns.txt
+# add named contrasts to config/massspec.yml
+Rscript scripts/02_ms_differential.R
+```
 
-#### Current prolfqua workflow
+Defaults are conservative: log2 transformation of linear DIA-NN abundances, no extra normalization, no imputation, and no complete-case requirement. Process-QC samples are retained for QC but excluded from differential modelling. Repeated animals use a prolfqua random-intercept mixed model by default. The fixed effects use a cell-means parameterization (`0 + analysis_cell`) so day-specific paired changes and between-condition contrasts are explicit rather than hidden in a large interaction formula.
 
-1. Copy `config/paths.example.yml` to `config/paths.yml` and set local abundance/metadata paths.
-2. Create `metadata/proteomics_samples.csv` from `metadata/proteomics_samples_template.csv`.
-3. Edit `config/proteomics.yml` to match column names, intensity scale, normalization choice, and the experimental design.
-4. Run `Rscript scripts/00_setup_R.R` once to initialize/snapshot the R environment.
-5. Optionally run the DIA-NN source inspection above before fixing the canonical mass-spec abundance input.
-6. Run `Rscript scripts/01_proteomics_qc.R` to construct the `LFQData`, preprocess it, write QC tables/plots, and export `results/proteomics/model_matrix_columns.txt`.
-7. Define named model contrasts under `model.contrasts` in `config/proteomics.yml` after inspecting the real design matrix.
-8. Run `Rscript scripts/02_proteomics_differential.R` for protein-level differential analysis.
+#### Olink Target 48 Mouse quantified concentrations
 
-Defaults are intentionally conservative: no missing-value imputation and no extra normalization are applied unless requested in the configuration. `model.mode: auto` uses limma for independent samples and switches to a random-intercept mixed model when repeated samples from the same `animal_id` are detected. This prevents accidental pseudoreplication, but the final fixed-effects structure and contrasts still need to be checked against the actual serum sampling design.
+The supplied Olink workbook is a quantified-concentration export in `pg/mL`, not an NPX export. It therefore has a separate parser and statistical workflow rather than being forced through prolfqua.
 
-Planned downstream steps:
+Olink analysis:
 
-1. Assay-specific QC and preprocessing
-2. Protein-level temporal and outcome analyses
-3. Pathway-level interpretation
+```bash
+Rscript scripts/03_olink_qc.R
+# inspect results/proteomics/olink/sample_design_counts.csv
+# inspect results/proteomics/olink/model_matrix_columns.txt
+# add named contrasts to config/olink.yml
+Rscript scripts/04_olink_differential.R
+```
+
+The scaffold parses the workbook's assay annotation rows (`Assay`, `Uniprot ID`, `OlinkID`, `Unit`), sample-level `QC Warning`, and quantified concentrations. Concentrations are log2 transformed for modelling. Missing/censored values are not imputed by default and no arbitrary assay-missingness threshold is imposed until the assay-specific missingness pattern is reviewed.
+
+Differential analysis uses `limma` with the same explicit `analysis_cell` parameterization as MS. Repeated baseline/endpoint samples are handled with `duplicateCorrelation` and `animal_id` as the block. This also allows the observed Olink design to remain estimable when some condition x endpoint cells are absent.
+
+#### Setup
+
+Copy `config/paths.example.yml` to `config/paths.yml`, edit local paths, and initialize the R environment once:
+
+```bash
+Rscript scripts/00_setup_R.R
+```
 
 ### Integration
 
