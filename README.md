@@ -30,6 +30,22 @@ Paper-facing analysis repository for the fracture-healing study, integrating spa
 
 ### Serum proteomics
 
+The serum workflow uses [`prolfqua`](https://github.com/fgcz/prolfqua) for proteomics data representation, preprocessing/QC, and differential modelling. The environment setup pins the stable `prolfqua` v1.5.0 release in `renv` rather than tracking the moving development branch.
+
+Current workflow:
+
+1. Copy `config/paths.example.yml` to `config/paths.yml` and set local abundance/metadata paths.
+2. Create `metadata/proteomics_samples.csv` from `metadata/proteomics_samples_template.csv`.
+3. Edit `config/proteomics.yml` to match column names, intensity scale, normalization choice, and the experimental design.
+4. Run `Rscript scripts/00_setup_R.R` once to initialize/snapshot the R environment.
+5. Run `Rscript scripts/01_proteomics_qc.R` to construct the `LFQData`, preprocess it, write QC tables/plots, and export `results/proteomics/model_matrix_columns.txt`.
+6. Define named model contrasts under `model.contrasts` in `config/proteomics.yml` after inspecting the real design matrix.
+7. Run `Rscript scripts/02_proteomics_differential.R` for protein-level differential analysis.
+
+Defaults are intentionally conservative: no missing-value imputation and no extra normalization are applied unless requested in the configuration. `model.mode: auto` uses limma for independent samples and switches to a random-intercept mixed model when repeated samples from the same `animal_id` are detected. This prevents accidental pseudoreplication, but the final fixed-effects structure and contrasts still need to be checked against the actual serum sampling design.
+
+Planned downstream steps:
+
 1. Assay-specific QC and preprocessing
 2. Protein-level temporal and outcome analyses
 3. Pathway-level interpretation
@@ -40,4 +56,4 @@ Cross-omics analyses are performed only after assay-specific analyses, using `an
 
 ## Reproducibility
 
-R dependencies will be managed with `renv`. Python dependencies for SpatialDM will be pinned separately once the Python workflow is initialized.
+R dependencies are managed with `renv`. Python dependencies for SpatialDM will be pinned separately once the Python workflow is initialized.
