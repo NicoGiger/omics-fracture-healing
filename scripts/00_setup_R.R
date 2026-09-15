@@ -15,14 +15,18 @@ if (!file.exists("renv.lock")) {
 renv::install(c(
   "yaml",
   "readr",
+  "readxl",
   "data.table",
   "dplyr",
   "tidyr",
+  "tibble",
   "ggplot2"
 ))
 
-# Pin the stable release rather than the moving development branch.
+# prolfqua is used only for the DIA-NN / mass-spec branch.
 renv::install("fgcz/prolfqua@v.1.5.0")
+# Olink quantified-concentration modelling uses limma directly.
+renv::install("bioc::limma")
 renv::snapshot()
 
 message("R environment initialized and snapshotted.")
