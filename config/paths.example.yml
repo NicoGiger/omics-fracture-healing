@@ -1,0 +1,6 @@
+# Copy this file to config/paths.yml and edit local paths.
+# config/paths.yml is intentionally git-ignored.
+
+proteomics:
+  abundance: data/proteomics/protein_abundance.tsv
+  metadata: metadata/proteomics_samples.csv
