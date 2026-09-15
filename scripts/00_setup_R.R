@@ -15,6 +15,7 @@ if (!file.exists("renv.lock")) {
 renv::install(c(
   "yaml",
   "readr",
+  "data.table",
   "dplyr",
   "tidyr",
   "ggplot2"
