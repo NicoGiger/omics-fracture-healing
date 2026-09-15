@@ -68,7 +68,7 @@ prepare_serum_metadata <- function(path, assay = c("massspec", "olink")) {
   out$analysis_cell <- ifelse(
     out$sample_type == "biological",
     paste0(out$condition_code, "_D", out$endpoint_day, "_", out$visit),
-    NA_character_
+    "ProcessQC"
   )
 
   if (anyDuplicated(out$sample_id)) {
