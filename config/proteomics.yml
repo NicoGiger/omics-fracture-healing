@@ -28,7 +28,14 @@ model:
   # Other supported values: limma, lmer.
   mode: auto
 
-  # "auto" constructs condition * timepoint when both columns are configured.
+  # Treat nominal study variables as categorical even if readr parses numeric
+  # labels (for example 3, 7, 14 days) as numbers.
+  condition_as_factor: true
+  timepoint_as_factor: true
+  batch_as_factor: true
+
+  # "auto" constructs condition * timepoint and adds batch as an additive
+  # covariate when a batch column is configured.
   fixed_effects: auto
 
   limma:
