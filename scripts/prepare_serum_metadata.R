@@ -2,7 +2,7 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) > 1L) {
-  stop("Usage: Rscript scripts/00_prepare_serum_metadata.R [Metadata.csv]", call. = FALSE)
+  stop("Usage: Rscript scripts/prepare_serum_metadata.R [Metadata.csv]", call. = FALSE)
 }
 
 if (!file.exists("README.md") || !file.exists("src/R/serum_metadata.R")) {

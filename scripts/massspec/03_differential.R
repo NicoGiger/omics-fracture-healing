@@ -9,7 +9,7 @@ source("src/R/massspec_prolfqua.R")
 cfg <- read_ms_config()
 lfq_path <- "results/proteomics/massspec/ms_lfq_preprocessed.rds"
 if (!file.exists(lfq_path)) {
-  stop("Run scripts/01_ms_qc.R first.")
+  stop("Run scripts/massspec/02_qc.R first.")
 }
 
 lfq <- load_ms_lfq(lfq_path)
