@@ -9,7 +9,7 @@ source("src/R/olink_analysis.R")
 cfg <- read_olink_config()
 input_path <- "results/proteomics/olink/olink_preprocessed.rds"
 if (!file.exists(input_path)) {
-  stop("Run scripts/03_olink_qc.R first.")
+  stop("Run scripts/olink/01_qc.R first.")
 }
 
 long <- readRDS(input_path)

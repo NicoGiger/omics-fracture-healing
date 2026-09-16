@@ -5,8 +5,8 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1L || length(args) > 2L) {
   stop(
     paste0(
-      "Usage: Rscript scripts/00_extract_diann_quant.R <report.tsv> [output_dir]\n",
-      "Example: Rscript scripts/00_extract_diann_quant.R /path/to/report.tsv data/proteomics/massspec/diann_extract"
+      "Usage: Rscript scripts/massspec/01_extract_diann_quant.R <report.tsv> [output_dir]\n",
+      "Example: Rscript scripts/massspec/01_extract_diann_quant.R /path/to/report.tsv data/proteomics/massspec/diann_extract"
     ),
     call. = FALSE
   )
@@ -14,7 +14,7 @@ if (length(args) < 1L || length(args) > 2L) {
 
 if (!requireNamespace("data.table", quietly = TRUE)) {
   stop(
-    "Package 'data.table' is required. Run Rscript scripts/00_setup_R.R first.",
+    "Package 'data.table' is required. Run Rscript scripts/setup_R.R first.",
     call. = FALSE
   )
 }
