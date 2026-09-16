@@ -1,0 +1,48 @@
+# DIA-NN / mass-spectrometry serum proteomics configuration.
+# Machine-specific paths live in config/paths.yml.
+
+input:
+  # Current checked matrix: data_protein_df_wide.csv, one Protein.Group row and
+  # one sample per column. DIA-NN source inspection may later replace the
+  # abundance field used to generate this matrix (e.g. PG.MaxLFQ vs PG.Normalised).
+  format: wide_protein
+  delimiter: ","
+
+columns:
+  protein_id: Protein.Group
+  sample_id: sample_id
+  animal_id: animal_id
+  analysis_cell: analysis_cell
+  sample_type: sample_type
+  batch: null
+
+preprocessing:
+  # DIA-NN protein quantities are on a linear abundance scale unless the local
+  # extract demonstrates otherwise.
+  intensity_scale: linear
+  zero_or_negative_to_na: true
+
+  # Keep DIA-NN normalization as the default. Additional prolfqua robust scaling
+  # is optional and should only be enabled after QC justifies it.
+  normalization: none
+
+filtering:
+  # Do not reproduce the old complete-case filter (protein present in every run).
+  # Leave null until a detection rule is agreed from the observed missingness.
+  max_missing_fraction: null
+
+model:
+  # Biological animals contribute baseline + one endpoint. prolfqua therefore
+  # defaults to a random-intercept mixed model when repeated animals are present.
+  mode: auto
+
+  # Cell-means parameterization respects the endpoint-cohort design and makes
+  # study contrasts explicit (e.g. Osteotomy_D3_endpoint - Osteotomy_D3_baseline).
+  fixed_effects: "0 + analysis_cell"
+
+  limma:
+    trend: true
+    robust: true
+
+  # Add only after scripts/01_ms_qc.R writes model_matrix_columns.txt.
+  contrasts: {}

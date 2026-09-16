@@ -1,0 +1,14 @@
+# Copy this file to config/paths.yml and edit local paths.
+# config/paths.yml is intentionally git-ignored.
+
+massspec:
+  # Current protein-level wide matrix (e.g. data_protein_df_wide.csv).
+  abundance: data/proteomics/massspec/data_protein_df_wide.csv
+  metadata: metadata/massspec_samples.csv
+  # Optional original DIA-NN report for scripts/00_extract_diann_quant.R.
+  diann_report: /path/to/diann_output.tsv
+
+olink:
+  # Supplied Olink Target 48 Mouse QUANT workbook (quantified pg/mL data).
+  quant: data/proteomics/olink/Target_48_Mouse_QUANT.xlsx
+  metadata: metadata/olink_samples.csv
