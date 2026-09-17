@@ -6,8 +6,7 @@ read_spatial_samples <- function(path = "metadata/spatial_samples.csv") {
   )
 
   required <- c(
-    "capture_id", "time_point", "bio_rep", "tech_rep", "data_subdir",
-    "annotation_file"
+    "capture_id", "time_point", "bio_rep", "tech_rep", "data_subdir"
   )
   missing <- setdiff(required, names(samples))
   if (length(missing) > 0L) {
@@ -22,30 +21,9 @@ read_spatial_samples <- function(path = "metadata/spatial_samples.csv") {
   samples
 }
 
-resolve_annotation_file <- function(data_dir, annotation_file = NA_character_) {
-  if (!is.na(annotation_file) && nzchar(annotation_file)) {
-    path <- file.path(data_dir, annotation_file)
-    if (!file.exists(path)) stop("Annotation file not found: ", path)
-    return(path)
-  }
-
-  candidates <- list.files(
-    data_dir,
-    pattern = "\\.csv$",
-    full.names = TRUE,
-    ignore.case = TRUE
-  )
-  if (length(candidates) != 1L) {
-    stop(
-      "Expected exactly one top-level annotation CSV in ", data_dir,
-      " but found ", length(candidates),
-      ". Set annotation_file explicitly in metadata/spatial_samples.csv."
-    )
-  }
-  candidates[[1L]]
-}
-
 read_spot_annotations <- function(path) {
+  if (!file.exists(path)) stop("Annotation file not found: ", path)
+
   annotation <- utils::read.csv(
     path,
     stringsAsFactors = FALSE,
@@ -64,7 +42,11 @@ read_spot_annotations <- function(path) {
   get_col <- function(candidates) {
     idx <- match(tolower(candidates), names_lower, nomatch = 0L)
     idx <- idx[idx > 0L]
-    if (length(idx) == 0L) rep(NA_character_, nrow(annotation)) else annotation[[idx[[1L]]]]
+    if (length(idx) == 0L) {
+      rep(NA_character_, nrow(annotation))
+    } else {
+      annotation[[idx[[1L]]]]
+    }
   }
 
   data.frame(
@@ -128,8 +110,11 @@ process_spatial_capture <- function(
 ) {
   data_dir <- file.path(data_root, capture$data_subdir)
   counts_file <- file.path(data_dir, "raw_feature_bc_matrix.h5")
+  annotation_file <- file.path(data_dir, "spa.csv")
+
   if (!dir.exists(data_dir)) stop("Spatial data directory not found: ", data_dir)
   if (!file.exists(counts_file)) stop("Counts file not found: ", counts_file)
+  if (!file.exists(annotation_file)) stop("Annotation file not found: ", annotation_file)
 
   obj <- Seurat::Load10X_Spatial(
     data.dir = data_dir,
@@ -139,7 +124,6 @@ process_spatial_capture <- function(
   )
   n_loaded <- ncol(obj)
 
-  annotation_file <- resolve_annotation_file(data_dir, capture$annotation_file)
   obj <- add_spot_annotations(obj, annotation_file)
 
   condition <- trimws(as.character(obj$condition))
