@@ -67,7 +67,7 @@ read_spot_annotations <- function(path) {
     if (length(idx) == 0L) rep(NA_character_, nrow(annotation)) else annotation[[idx[[1L]]]]
   }
 
-  out <- data.frame(
+  data.frame(
     condition = get_col(c("condition", "group")),
     roi = get_col("roi"),
     tissue = get_col("tissue"),
@@ -75,8 +75,6 @@ read_spot_annotations <- function(path) {
     stringsAsFactors = FALSE,
     row.names = barcodes
   )
-
-  out
 }
 
 add_spot_annotations <- function(obj, path) {
