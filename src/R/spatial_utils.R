@@ -7,7 +7,7 @@ read_spatial_samples <- function(path = "metadata/spatial_samples.csv") {
 
   required <- c(
     "capture_id", "time_point", "bio_rep", "tech_rep", "data_subdir",
-    "group_file", "roi_file", "tissue_file", "artifact_file"
+    "annotation_file"
   )
   missing <- setdiff(required, names(samples))
   if (length(missing) > 0L) {
@@ -22,35 +22,68 @@ read_spatial_samples <- function(path = "metadata/spatial_samples.csv") {
   samples
 }
 
-add_barcode_annotation <- function(obj, path, value_col, out_col) {
-  if (is.na(path) || !nzchar(path)) {
-    values <- rep(NA_character_, ncol(obj))
-    names(values) <- colnames(obj)
-    return(SeuratObject::AddMetaData(obj, values, col.name = out_col))
-  }
-  if (!file.exists(path)) {
-    stop("Annotation file not found: ", path)
+resolve_annotation_file <- function(data_dir, annotation_file = NA_character_) {
+  if (!is.na(annotation_file) && nzchar(annotation_file)) {
+    path <- file.path(data_dir, annotation_file)
+    if (!file.exists(path)) stop("Annotation file not found: ", path)
+    return(path)
   }
 
+  candidates <- list.files(
+    data_dir,
+    pattern = "\\.csv$",
+    full.names = TRUE,
+    ignore.case = TRUE
+  )
+  if (length(candidates) != 1L) {
+    stop(
+      "Expected exactly one top-level annotation CSV in ", data_dir,
+      " but found ", length(candidates),
+      ". Set annotation_file explicitly in metadata/spatial_samples.csv."
+    )
+  }
+  candidates[[1L]]
+}
+
+read_spot_annotations <- function(path) {
   annotation <- utils::read.csv(
     path,
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
-  barcode_idx <- match("barcode", tolower(names(annotation)))
-  value_idx <- match(tolower(value_col), tolower(names(annotation)))
-  if (is.na(barcode_idx) || is.na(value_idx)) {
-    stop("Expected columns 'Barcode' and '", value_col, "' in ", path)
-  }
+
+  names_lower <- tolower(names(annotation))
+  barcode_idx <- match("barcode", names_lower)
+  if (is.na(barcode_idx)) stop("Expected a Barcode column in ", path)
 
   barcodes <- annotation[[barcode_idx]]
   if (anyDuplicated(barcodes)) {
     stop("Duplicate barcodes in annotation file: ", path)
   }
 
-  values <- annotation[[value_idx]][match(colnames(obj), barcodes)]
-  names(values) <- colnames(obj)
-  SeuratObject::AddMetaData(obj, values, col.name = out_col)
+  get_col <- function(candidates) {
+    idx <- match(tolower(candidates), names_lower, nomatch = 0L)
+    idx <- idx[idx > 0L]
+    if (length(idx) == 0L) rep(NA_character_, nrow(annotation)) else annotation[[idx[[1L]]]]
+  }
+
+  out <- data.frame(
+    condition = get_col(c("condition", "group")),
+    roi = get_col("roi"),
+    tissue = get_col("tissue"),
+    artifact = get_col(c("artifact", "artefact", "artifacts", "artefacts")),
+    stringsAsFactors = FALSE,
+    row.names = barcodes
+  )
+
+  out
+}
+
+add_spot_annotations <- function(obj, path) {
+  annotation <- read_spot_annotations(path)
+  mapped <- annotation[match(colnames(obj), rownames(annotation)), , drop = FALSE]
+  rownames(mapped) <- colnames(obj)
+  SeuratObject::AddMetaData(obj, mapped)
 }
 
 artifact_is_flagged <- function(x) {
@@ -72,9 +105,7 @@ summarize_condition_qc <- function(meta_before, meta_after, capture) {
 
     data.frame(
       capture_id = capture$capture_id,
-      sample_id = paste0(
-        capture$time_point, "_", condition, "_r", capture$bio_rep
-      ),
+      sample_id = paste0(capture$time_point, "_", condition, "_r", capture$bio_rep),
       section_id = paste(capture$capture_id, condition, sep = "_"),
       time_point = capture$time_point,
       condition = condition,
@@ -82,11 +113,7 @@ summarize_condition_qc <- function(meta_before, meta_after, capture) {
       tech_rep = capture$tech_rep,
       n_spots_before_qc = nrow(before),
       n_spots_retained = nrow(after),
-      retained_fraction = if (nrow(before) > 0L) {
-        nrow(after) / nrow(before)
-      } else {
-        NA_real_
-      },
+      retained_fraction = if (nrow(before) > 0L) nrow(after) / nrow(before) else NA_real_,
       median_total_counts = safe_median(after$nCount_Spatial),
       median_detected_genes = safe_median(after$nFeature_Spatial),
       median_percent_mt = safe_median(after$percent.mt),
@@ -114,43 +141,23 @@ process_spatial_capture <- function(
   )
   n_loaded <- ncol(obj)
 
-  annotation_path <- function(filename) {
-    if (is.na(filename) || !nzchar(filename)) return(NA_character_)
-    file.path(data_dir, filename)
-  }
-
-  obj <- add_barcode_annotation(
-    obj, annotation_path(capture$group_file), "group", "condition"
-  )
-  obj <- add_barcode_annotation(
-    obj, annotation_path(capture$roi_file), "ROI", "roi"
-  )
-  obj <- add_barcode_annotation(
-    obj, annotation_path(capture$tissue_file), "tissue", "tissue"
-  )
-  obj <- add_barcode_annotation(
-    obj, annotation_path(capture$artifact_file), "artefacts", "artifact"
-  )
+  annotation_file <- resolve_annotation_file(data_dir, capture$annotation_file)
+  obj <- add_spot_annotations(obj, annotation_file)
 
   condition <- trimws(as.character(obj$condition))
   condition[tolower(condition) == "union"] <- "Union"
   condition[tolower(condition) == "nonunion"] <- "NonUnion"
   obj$condition <- condition
 
-  condition_assigned <- !is.na(obj$condition) &
-    obj$condition %in% c("Union", "NonUnion")
+  condition_assigned <- !is.na(obj$condition) & obj$condition %in% c("Union", "NonUnion")
   n_condition_assigned <- sum(condition_assigned)
   if (n_condition_assigned == 0L) {
     stop("No Union/NonUnion spots assigned for ", capture$capture_id)
   }
 
   n_roi_assigned <- sum(condition_assigned & !is.na(obj$roi) & obj$roi != "")
-  tissue_available <- !is.na(capture$tissue_file) && nzchar(capture$tissue_file)
-  n_tissue_assigned <- if (tissue_available) {
-    sum(condition_assigned & !is.na(obj$tissue) & obj$tissue != "")
-  } else {
-    NA_integer_
-  }
+  n_tissue_assigned <- sum(condition_assigned & !is.na(obj$tissue) & obj$tissue != "")
+  tissue_available <- n_tissue_assigned > 0L
 
   obj <- subset(obj, cells = colnames(obj)[condition_assigned])
 
@@ -179,9 +186,7 @@ process_spatial_capture <- function(
   obj$time_point <- capture$time_point
   obj$bio_rep <- capture$bio_rep
   obj$tech_rep <- capture$tech_rep
-  obj$sample_id <- paste0(
-    obj$time_point, "_", obj$condition, "_r", obj$bio_rep
-  )
+  obj$sample_id <- paste0(obj$time_point, "_", obj$condition, "_r", obj$bio_rep)
   obj$section_id <- paste(obj$capture_id, obj$condition, sep = "_")
   obj$orig.ident <- obj$section_id
 
@@ -197,6 +202,7 @@ process_spatial_capture <- function(
 
   annotation_coverage <- data.frame(
     capture_id = capture$capture_id,
+    annotation_file = basename(annotation_file),
     time_point = capture$time_point,
     bio_rep = capture$bio_rep,
     tech_rep = capture$tech_rep,
@@ -206,11 +212,7 @@ process_spatial_capture <- function(
     roi_assignment_fraction = n_roi_assigned / n_condition_assigned,
     tissue_annotation_available = tissue_available,
     n_tissue_assigned = n_tissue_assigned,
-    tissue_assignment_fraction = if (tissue_available) {
-      n_tissue_assigned / n_condition_assigned
-    } else {
-      NA_real_
-    },
+    tissue_assignment_fraction = n_tissue_assigned / n_condition_assigned,
     n_artifact_flagged = n_artifact_flagged,
     n_spots_before_qc = nrow(meta_before_qc),
     n_spots_retained = nrow(meta_after_qc),
