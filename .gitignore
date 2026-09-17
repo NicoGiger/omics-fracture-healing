@@ -41,6 +41,10 @@ __pycache__/
 # Machine-specific paths/config
 config/paths.yml
 
+# Local spatial data and processed objects
+data/spatial/raw/
+data/spatial/processed/
+
 # OS / IDE
 .DS_Store
 Thumbs.db
